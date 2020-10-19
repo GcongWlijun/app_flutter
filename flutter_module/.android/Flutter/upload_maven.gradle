@@ -1,0 +1,53 @@
+apply plugin: 'maven'
+
+
+
+def getRepositoryUsername() {
+    return "YLMw48"
+}
+def getRepositoryPassword() {
+    return  "qwe6bQ7vjQ"
+}
+def getRepositoryUrl() {
+    return  "https://repo.rdc.aliyun.com/repository/113598-release-RnjptC/"
+}
+
+afterEvaluate { project ->
+    uploadArchives {
+        repositories {
+            mavenDeployer {
+                pom.groupId = "me.zcy.flutter_module"
+                pom.artifactId = "flutter_module"
+                pom.version = '1.2'
+                repository(url: getRepositoryUrl()) {
+                    authentication(userName: getRepositoryUsername(), password: getRepositoryPassword())
+                }
+            }
+        }
+    }
+
+    if (project.hasProperty("android")) { // Android libraries
+        task flutterSourcesJar(type: Jar) {
+            classifier = 'sources'
+            from android.sourceSets.main.java.srcDirs
+        }
+
+    } else { // Java libraries
+        task flutterSourcesJar(type: Jar, dependsOn: classes) {
+            classifier = 'sources'
+            from sourceSets.main.allSource
+        }
+    }
+
+
+    artifacts {
+        archives flutterSourcesJar
+    }
+
+    //解决 JavaDoc 中文注释生成失败的问题
+    tasks.withType(Javadoc) {
+        options.addStringOption('Xdoclint:none', '-quiet')
+        options.addStringOption('encoding', 'UTF-8')
+        options.addStringOption('charSet', 'UTF-8')
+    }
+}

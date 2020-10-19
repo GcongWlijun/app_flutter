@@ -1,0 +1,71 @@
+apply plugin: MavenPlugin
+apply from:'upload_maven.gradle'
+class MavenPlugin implements Plugin<Project> {
+
+
+    @Override
+    void apply(Project target) {
+        target.afterEvaluate {
+            def scriptFile = target.rootDir
+            def FlutterFile = new File(target.rootDir,"Flutter")
+            def uploadFile = new File(FlutterFile,"upload_maven.gradle")
+            def flutterProjectRoot = scriptFile.parentFile
+            def plugins = new Properties()
+            def pluginsFile = new File(flutterProjectRoot, '.flutter-plugins')
+            if (pluginsFile.exists()) {
+                pluginsFile.withReader('UTF-8') { reader -> plugins.load(reader) }
+            }
+
+            plugins.each { name, path ->
+
+                def version = "1.1-SNAPSHOT"
+                def folderName = new File(path).getName()
+                if(folderName.contains("-")){
+                    version = folderName.split("-")[1]+"-SNAPSHOT"  //每次更新flutter 插件都更新snapshot版本
+//                    version = folderName.split("-")[1]
+                }
+
+                def properties = new Properties()
+
+                def pluginDirectory = flutterProjectRoot.toPath().resolve(path).resolve('android').toFile()
+                def propertiesFile = new File(pluginDirectory,'gradle.properties')
+                def buildFile = new File(pluginDirectory,'build.gradle')
+
+
+                def list = []
+                buildFile.withReader('UTF-8') { reader ->
+                    reader.eachLine {
+                        if (it.contains('group ')) {
+                            it = "group \'com.flutter.plugin\'"
+                        } else if (it.contains('version ')) {
+                            it = "version "+"\'"+version+"\'"
+                        } else if (it.contains('apply plugin: \'com.android.library\'')) {
+                            list.add('apply from:' + '\''+uploadFile.getPath()+ '\'' + "\n")
+                        } else if(it.contains('apply from:' + '\''+uploadFile.getPath()+ '\'')){
+                            it = ""
+                        }
+                        list.add(it + "\n")
+                    }
+                }
+                buildFile.withWriter('UTF-8') { writer ->
+                    list.each {
+                        writer.write(it)
+                    }
+                }
+
+                if (propertiesFile.exists()) {
+                    propertiesFile.withReader('UTF-8') { reader -> properties.load(reader) }
+                }
+
+
+                properties.setProperty("GROUP","com.flutter.plugin")
+                properties.setProperty("ARTIFACT_ID",name)
+                properties.setProperty("VERSION_NAME",version)
+                properties.store(new FileOutputStream(propertiesFile),"maven configuration");
+
+            }
+        }
+
+
+    }
+}
